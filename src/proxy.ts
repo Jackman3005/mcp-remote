@@ -38,6 +38,7 @@ async function runProxy(
   authorizeResource: string,
   ignoredTools: string[],
   authTimeoutMs: number,
+  forceAuth: boolean = false,
 ) {
   // Set up event emitter for auth flow
   const events = new EventEmitter()
@@ -88,7 +89,16 @@ async function runProxy(
 
   try {
     // Connect to remote server with lazy authentication
-    const remoteTransport = await connectToRemoteServer(null, serverUrl, authProvider, headers, authInitializer, transportStrategy)
+    const remoteTransport = await connectToRemoteServer(
+      null,
+      serverUrl,
+      authProvider,
+      headers,
+      authInitializer,
+      transportStrategy,
+      new Set(),
+      forceAuth,
+    )
 
     // Set up bidirectional proxy between local and remote transports
     mcpProxy({
@@ -160,6 +170,7 @@ parseCommandLineArgs(process.argv.slice(2), 'Usage: npx tsx proxy.ts <https://se
       authorizeResource,
       ignoredTools,
       authTimeoutMs,
+      forceAuth,
     }) => {
       return runProxy(
         serverUrl,
@@ -172,6 +183,7 @@ parseCommandLineArgs(process.argv.slice(2), 'Usage: npx tsx proxy.ts <https://se
         authorizeResource,
         ignoredTools,
         authTimeoutMs,
+        forceAuth,
       )
     },
   )

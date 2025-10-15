@@ -178,6 +178,16 @@ You can specify multiple `--ignore-tool` flags to ignore different patterns. Exa
       ]
 ```
 
+* To force OAuth authentication before connecting to the server, add the `--force-auth` flag. This is useful when your MCP server supports both anonymous and authenticated access, and you want to explicitly trigger the OAuth flow to obtain credentials. Without this flag, authentication only happens when the server returns an authentication error.
+
+```json
+      "args": [
+        "mcp-remote",
+        "https://remote.mcp.server/sse",
+        "--force-auth"
+      ]
+```
+
 ### Transport Strategies
 
 MCP Remote supports different transport strategies when connecting to an MCP server. This allows you to control whether it uses Server-Sent Events (SSE) or HTTP transport, and in what order it tries them.

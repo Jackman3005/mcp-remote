@@ -1,4 +1,4 @@
-import { OAuthClientProvider, UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
+import { OAuthClientProvider, UnauthorizedError, auth as oauthAuth } from '@modelcontextprotocol/sdk/client/auth.js'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
@@ -258,6 +258,7 @@ export type AuthInitializer = () => Promise<{
  * @param authInitializer Function to initialize authentication when needed
  * @param transportStrategy Strategy for selecting transport type ('sse-only', 'http-only', 'sse-first', 'http-first')
  * @param recursionReasons Set of reasons for recursive calls (internal use)
+ * @param forceAuth Force OAuth authentication before connecting
  * @returns The connected transport
  */
 export async function connectToRemoteServer(
@@ -268,9 +269,60 @@ export async function connectToRemoteServer(
   authInitializer: AuthInitializer,
   transportStrategy: TransportStrategy = 'http-first',
   recursionReasons: Set<string> = new Set(),
+  forceAuth: boolean = false,
 ): Promise<Transport> {
   log(`[${pid}] Connecting to remote server: ${serverUrl}`)
   const url = new URL(serverUrl)
+
+  // If force auth is enabled, initiate OAuth flow before attempting connection
+  if (forceAuth && !recursionReasons.has(REASON_AUTH_NEEDED)) {
+    log('Force authentication enabled - initiating OAuth flow...')
+    debugLog('Force auth mode: initializing auth before connection attempt')
+
+    const { waitForAuthCode, skipBrowserAuth } = await authInitializer()
+
+    if (skipBrowserAuth) {
+      log('Authentication was completed by another instance - using tokens from disk')
+    } else {
+      try {
+        // Start the OAuth flow - this will open the browser
+        log('Starting OAuth authorization flow...')
+        debugLog('Calling SDK auth() to initiate flow')
+        const result = await oauthAuth(authProvider, { serverUrl })
+        debugLog('Auth flow initiated, result:', result)
+
+        if (result === 'REDIRECT') {
+          // Wait for the authorization code from the callback
+          log('Waiting for authorization callback...')
+          const code = await waitForAuthCode()
+          debugLog('Received auth code, exchanging for tokens')
+
+          // Complete the OAuth flow by exchanging the code for tokens
+          log('Exchanging authorization code for tokens...')
+          const finalResult = await oauthAuth(authProvider, { serverUrl, authorizationCode: code })
+          debugLog('Token exchange completed, result:', finalResult)
+
+          if (finalResult === 'AUTHORIZED') {
+            log('Authorization successful!')
+          } else {
+            throw new Error(`Unexpected auth result: ${finalResult}`)
+          }
+        } else if (result === 'AUTHORIZED') {
+          log('Already authorized (tokens were valid)')
+        }
+      } catch (authError: any) {
+        log('Authorization error:', authError)
+        debugLog('Authorization error during forced auth', {
+          errorMessage: authError.message,
+          stack: authError.stack,
+        })
+        throw authError
+      }
+    }
+
+    // Mark that we've done auth so we don't repeat it
+    recursionReasons.add(REASON_AUTH_NEEDED)
+  }
 
   // Create transport with eventSourceInit to pass Authorization header if present
   const eventSourceInit = {
@@ -365,6 +417,7 @@ export async function connectToRemoteServer(
         authInitializer,
         sseTransport ? 'http-only' : 'sse-only',
         recursionReasons,
+        forceAuth,
       )
     } else if (error instanceof UnauthorizedError || (error instanceof Error && error.message.includes('Unauthorized'))) {
       log('Authentication required. Initializing auth...')
@@ -409,7 +462,16 @@ export async function connectToRemoteServer(
         debugLog('Recursively reconnecting after auth', { recursionReasons: Array.from(recursionReasons) })
 
         // Recursively call connectToRemoteServer with the updated recursion tracking
-        return connectToRemoteServer(client, serverUrl, authProvider, headers, authInitializer, transportStrategy, recursionReasons)
+        return connectToRemoteServer(
+          client,
+          serverUrl,
+          authProvider,
+          headers,
+          authInitializer,
+          transportStrategy,
+          recursionReasons,
+          forceAuth,
+        )
       } catch (authError: any) {
         log('Authorization error:', authError)
         debugLog('Authorization error during finishAuth', {
@@ -726,6 +788,12 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
     }
   }
 
+  // Parse force auth flag
+  const forceAuth = args.includes('--force-auth')
+  if (forceAuth) {
+    log('Force authentication mode enabled - OAuth flow will be initiated immediately')
+  }
+
   if (!serverUrl) {
     log(usage)
     process.exit(1)
@@ -800,6 +868,7 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
     authorizeResource,
     ignoredTools,
     authTimeoutMs,
+    forceAuth,
   }
 }
 

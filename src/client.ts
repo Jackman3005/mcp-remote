@@ -37,6 +37,7 @@ async function runClient(
   staticOAuthClientMetadata: StaticOAuthClientMetadata,
   staticOAuthClientInfo: StaticOAuthClientInformationFull,
   authTimeoutMs: number,
+  forceAuth: boolean = false,
 ) {
   // Set up event emitter for auth flow
   const events = new EventEmitter()
@@ -94,7 +95,16 @@ async function runClient(
 
   try {
     // Connect to remote server with lazy authentication
-    const transport = await connectToRemoteServer(client, serverUrl, authProvider, headers, authInitializer, transportStrategy)
+    const transport = await connectToRemoteServer(
+      client,
+      serverUrl,
+      authProvider,
+      headers,
+      authInitializer,
+      transportStrategy,
+      new Set(),
+      forceAuth,
+    )
 
     // Set up message and error handlers
     transport.onmessage = (message) => {
@@ -161,7 +171,17 @@ async function runClient(
 // Parse command-line arguments and run the client
 parseCommandLineArgs(process.argv.slice(2), 'Usage: npx tsx client.ts <https://server-url> [callback-port] [--debug]')
   .then(
-    ({ serverUrl, callbackPort, headers, transportStrategy, host, staticOAuthClientMetadata, staticOAuthClientInfo, authTimeoutMs }) => {
+    ({
+      serverUrl,
+      callbackPort,
+      headers,
+      transportStrategy,
+      host,
+      staticOAuthClientMetadata,
+      staticOAuthClientInfo,
+      authTimeoutMs,
+      forceAuth,
+    }) => {
       return runClient(
         serverUrl,
         callbackPort,
@@ -171,6 +191,7 @@ parseCommandLineArgs(process.argv.slice(2), 'Usage: npx tsx client.ts <https://s
         staticOAuthClientMetadata,
         staticOAuthClientInfo,
         authTimeoutMs,
+        forceAuth,
       )
     },
   )
