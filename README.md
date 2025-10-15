@@ -178,13 +178,26 @@ You can specify multiple `--ignore-tool` flags to ignore different patterns. Exa
       ]
 ```
 
-* To force OAuth authentication before connecting to the server, add the `--force-auth` flag. This is useful when your MCP server supports both anonymous and authenticated access, and you want to explicitly trigger the OAuth flow to obtain credentials. Without this flag, authentication only happens when the server returns an authentication error.
+* To force OAuth authentication before connecting to the server, add the `--force-auth-with-scopes` flag. This is useful when your MCP server supports both anonymous and authenticated access, and you want to explicitly trigger the OAuth flow to obtain credentials with specific scopes. Without this flag, authentication only happens when the server returns an authentication error.
+
+You can optionally specify the OAuth scopes after the flag. If not specified, defaults to `openid`:
 
 ```json
       "args": [
         "mcp-remote",
         "https://remote.mcp.server/sse",
-        "--force-auth"
+        "--force-auth-with-scopes",
+        "openid profile email"
+      ]
+```
+
+Or use the default scope by omitting the scope value:
+
+```json
+      "args": [
+        "mcp-remote",
+        "https://remote.mcp.server/sse",
+        "--force-auth-with-scopes"
       ]
 ```
 

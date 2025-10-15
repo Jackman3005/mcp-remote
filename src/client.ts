@@ -37,7 +37,7 @@ async function runClient(
   staticOAuthClientMetadata: StaticOAuthClientMetadata,
   staticOAuthClientInfo: StaticOAuthClientInformationFull,
   authTimeoutMs: number,
-  forceAuth: boolean = false,
+  forceAuthScope: string | null = null,
 ) {
   // Set up event emitter for auth flow
   const events = new EventEmitter()
@@ -103,7 +103,7 @@ async function runClient(
       authInitializer,
       transportStrategy,
       new Set(),
-      forceAuth,
+      forceAuthScope,
     )
 
     // Set up message and error handlers
@@ -180,7 +180,7 @@ parseCommandLineArgs(process.argv.slice(2), 'Usage: npx tsx client.ts <https://s
       staticOAuthClientMetadata,
       staticOAuthClientInfo,
       authTimeoutMs,
-      forceAuth,
+      forceAuthScope,
     }) => {
       return runClient(
         serverUrl,
@@ -191,7 +191,7 @@ parseCommandLineArgs(process.argv.slice(2), 'Usage: npx tsx client.ts <https://s
         staticOAuthClientMetadata,
         staticOAuthClientInfo,
         authTimeoutMs,
-        forceAuth,
+        forceAuthScope,
       )
     },
   )

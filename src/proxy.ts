@@ -38,7 +38,7 @@ async function runProxy(
   authorizeResource: string,
   ignoredTools: string[],
   authTimeoutMs: number,
-  forceAuth: boolean = false,
+  forceAuthScope: string | null = null,
 ) {
   // Set up event emitter for auth flow
   const events = new EventEmitter()
@@ -97,7 +97,7 @@ async function runProxy(
       authInitializer,
       transportStrategy,
       new Set(),
-      forceAuth,
+      forceAuthScope,
     )
 
     // Set up bidirectional proxy between local and remote transports
@@ -170,7 +170,7 @@ parseCommandLineArgs(process.argv.slice(2), 'Usage: npx tsx proxy.ts <https://se
       authorizeResource,
       ignoredTools,
       authTimeoutMs,
-      forceAuth,
+      forceAuthScope,
     }) => {
       return runProxy(
         serverUrl,
@@ -183,7 +183,7 @@ parseCommandLineArgs(process.argv.slice(2), 'Usage: npx tsx proxy.ts <https://se
         authorizeResource,
         ignoredTools,
         authTimeoutMs,
-        forceAuth,
+        forceAuthScope,
       )
     },
   )

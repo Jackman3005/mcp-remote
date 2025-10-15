@@ -258,7 +258,7 @@ export type AuthInitializer = () => Promise<{
  * @param authInitializer Function to initialize authentication when needed
  * @param transportStrategy Strategy for selecting transport type ('sse-only', 'http-only', 'sse-first', 'http-first')
  * @param recursionReasons Set of reasons for recursive calls (internal use)
- * @param forceAuth Force OAuth authentication before connecting
+ * @param forceAuthScope OAuth scope to use when forcing authentication (null disables force auth)
  * @returns The connected transport
  */
 export async function connectToRemoteServer(
@@ -269,13 +269,13 @@ export async function connectToRemoteServer(
   authInitializer: AuthInitializer,
   transportStrategy: TransportStrategy = 'http-first',
   recursionReasons: Set<string> = new Set(),
-  forceAuth: boolean = false,
+  forceAuthScope: string | null = null,
 ): Promise<Transport> {
   log(`[${pid}] Connecting to remote server: ${serverUrl}`)
   const url = new URL(serverUrl)
 
   // If force auth is enabled, initiate OAuth flow before attempting connection
-  if (forceAuth && !recursionReasons.has(REASON_AUTH_NEEDED)) {
+  if (forceAuthScope && !recursionReasons.has(REASON_AUTH_NEEDED)) {
     log('Force authentication enabled - initiating OAuth flow...')
     debugLog('Force auth mode: initializing auth before connection attempt')
 
@@ -288,7 +288,7 @@ export async function connectToRemoteServer(
         // Start the OAuth flow - this will open the browser
         log('Starting OAuth authorization flow...')
         debugLog('Calling SDK auth() to initiate flow')
-        const result = await oauthAuth(authProvider, { serverUrl })
+        const result = await oauthAuth(authProvider, { serverUrl, scope: forceAuthScope })
         debugLog('Auth flow initiated, result:', result)
 
         if (result === 'REDIRECT') {
@@ -299,7 +299,7 @@ export async function connectToRemoteServer(
 
           // Complete the OAuth flow by exchanging the code for tokens
           log('Exchanging authorization code for tokens...')
-          const finalResult = await oauthAuth(authProvider, { serverUrl, authorizationCode: code })
+          const finalResult = await oauthAuth(authProvider, { serverUrl, authorizationCode: code, scope: forceAuthScope })
           debugLog('Token exchange completed, result:', finalResult)
 
           if (finalResult === 'AUTHORIZED') {
@@ -417,7 +417,7 @@ export async function connectToRemoteServer(
         authInitializer,
         sseTransport ? 'http-only' : 'sse-only',
         recursionReasons,
-        forceAuth,
+        forceAuthScope,
       )
     } else if (error instanceof UnauthorizedError || (error instanceof Error && error.message.includes('Unauthorized'))) {
       log('Authentication required. Initializing auth...')
@@ -470,7 +470,7 @@ export async function connectToRemoteServer(
           authInitializer,
           transportStrategy,
           recursionReasons,
-          forceAuth,
+          forceAuthScope,
         )
       } catch (authError: any) {
         log('Authorization error:', authError)
@@ -788,10 +788,23 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
     }
   }
 
-  // Parse force auth flag
-  const forceAuth = args.includes('--force-auth')
-  if (forceAuth) {
-    log('Force authentication mode enabled - OAuth flow will be initiated immediately')
+  // Parse force auth with scopes flag
+  let forceAuthScope: string | null = null
+  const forceAuthIndex = args.indexOf('--force-auth-with-scopes')
+  if (forceAuthIndex !== -1) {
+    // Check if there's a value after the flag
+    const nextArg = args[forceAuthIndex + 1]
+    if (nextArg && !nextArg.startsWith('--')) {
+      // Use the provided scope
+      forceAuthScope = nextArg
+      args.splice(forceAuthIndex, 2)
+      log(`Force authentication mode enabled with scopes: ${forceAuthScope}`)
+    } else {
+      // Use default scope
+      forceAuthScope = 'openid'
+      args.splice(forceAuthIndex, 1)
+      log('Force authentication mode enabled with default scope: openid')
+    }
   }
 
   if (!serverUrl) {
@@ -868,7 +881,7 @@ export async function parseCommandLineArgs(args: string[], usage: string) {
     authorizeResource,
     ignoredTools,
     authTimeoutMs,
-    forceAuth,
+    forceAuthScope,
   }
 }
 
