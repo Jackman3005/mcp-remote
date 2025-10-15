@@ -27,6 +27,7 @@
     "build:watch": "tsup --watch",
     "check": "prettier --check . && tsc",
     "lint-fix": "prettier --check . --write",
+    "prepare": "npm run build",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest"
   },
